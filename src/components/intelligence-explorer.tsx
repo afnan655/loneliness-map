@@ -6,9 +6,13 @@ import {
   Background,
   Controls,
   Edge,
+  Handle,
   MarkerType,
   MiniMap,
   Node,
+  NodeProps,
+  NodeTypes,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -29,7 +33,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   categoryColors,
   conceptById,
@@ -51,6 +55,30 @@ const primaryIds = [
 ];
 
 const demoPath = ["loneliness", "belonging-loneliness", "community-membership", "running-club"];
+
+type ConceptNodeData = {
+  label: string;
+  nodeStyle: CSSProperties;
+};
+
+function ConceptNode({ data }: NodeProps<Node<ConceptNodeData>>) {
+  return (
+    <div style={data.nodeStyle}>
+      <Handle className="!h-1 !w-1 !border-0 !bg-transparent" position={Position.Top} type="target" />
+      <div className="pointer-events-none">{data.label}</div>
+      <Handle className="!h-1 !w-1 !border-0 !bg-transparent" position={Position.Bottom} type="source" />
+    </div>
+  );
+}
+
+const nodeTypes = {
+  concept: ConceptNode,
+} satisfies NodeTypes;
+
+function safeNodeType(type?: string) {
+  const requestedType = type ?? "concept";
+  return requestedType in nodeTypes ? requestedType : undefined;
+}
 
 const branchAngles: Record<string, number> = {
   "social-loneliness": -155,
@@ -118,22 +146,31 @@ function buildGraph(selectedId: string, searchId: string | null, collapsed: Set<
       const isHighlighted = highlighted.has(concept.id);
       return {
         id: concept.id,
+        type: safeNodeType(concept.type),
         position: conceptPosition(concept),
-        data: { label: concept.label },
+        data: {
+          label: concept.label,
+          nodeStyle: {
+            alignItems: "center",
+            background: palette.bg,
+            border: `1px solid ${isFocus ? "#111827" : palette.border}`,
+            borderRadius: concept.id === "loneliness" ? 999 : 18,
+            boxShadow: isFocus ? `0 0 0 8px ${palette.ring}, 0 22px 60px rgba(15,23,42,.18)` : "0 14px 34px rgba(15,23,42,.12)",
+            color: palette.text,
+            display: "flex",
+            fontSize: concept.id === "loneliness" ? 19 : primaryIds.includes(concept.id) ? 14 : 12,
+            fontWeight: concept.id === "loneliness" ? 800 : 700,
+            justifyContent: "center",
+            lineHeight: 1.18,
+            minHeight: concept.id === "loneliness" ? 68 : primaryIds.includes(concept.id) ? 48 : 42,
+            padding: concept.id === "loneliness" ? "20px 26px" : "13px 15px",
+            textAlign: "center",
+            width: concept.id === "loneliness" ? 190 : primaryIds.includes(concept.id) ? 178 : 154,
+          },
+        },
         className: clsx("graph-node", isFocus && "graph-node-focus", isHighlighted && "graph-node-highlight"),
         style: {
-          background: palette.bg,
-          border: `1px solid ${isFocus ? "#111827" : palette.border}`,
-          color: palette.text,
-          borderRadius: concept.id === "loneliness" ? 999 : 18,
-          boxShadow: isFocus ? `0 0 0 8px ${palette.ring}, 0 22px 60px rgba(15,23,42,.18)` : "0 14px 34px rgba(15,23,42,.12)",
-          fontSize: concept.id === "loneliness" ? 19 : primaryIds.includes(concept.id) ? 14 : 12,
-          fontWeight: concept.id === "loneliness" ? 800 : 700,
           opacity: searchId && !isHighlighted ? 0.2 : 1,
-          padding: concept.id === "loneliness" ? "20px 26px" : "13px 15px",
-          width: concept.id === "loneliness" ? 190 : primaryIds.includes(concept.id) ? 178 : 154,
-          textAlign: "center",
-          lineHeight: 1.18,
         },
       };
     });
@@ -262,7 +299,7 @@ function ExplorerCanvas() {
               </button>
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
-                  ["103", "Concepts"],
+                  [String(conceptList.length), "Concepts"],
                   [String(graphEdges.length), "Edges"],
                   ["6", "Lenses"],
                 ].map(([value, label]) => (
@@ -345,6 +382,7 @@ function ExplorerCanvas() {
             <ReactFlow
               nodes={nodes}
               edges={edges}
+              nodeTypes={nodeTypes}
               onNodeClick={(_, node) => selectConcept(node.id)}
               minZoom={0.18}
               maxZoom={1.8}

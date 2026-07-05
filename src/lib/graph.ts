@@ -6,6 +6,7 @@ export type Concept = {
   label: string;
   category: string;
   definition: string;
+  type?: string;
 };
 
 export type GraphEdge = {
